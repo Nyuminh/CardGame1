@@ -1,5 +1,5 @@
-const User = require('../models/User');
-const { generateToken } = require('../utils/jwt');
+const { getCookieOptions } = require('../utils/jwt');
+const authService = require('../services/authService');
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -7,19 +7,8 @@ const { generateToken } = require('../utils/jwt');
 const register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
-
-    // Create user
-    const user = new User({
-      username,
-      email,
-      password
-    });
-
-    await user.save();
-
-    // Generate JWT token
-    const token = generateToken(user._id);
-
+    const { user, accessToken, refreshToken } = await authService.registerService({ username, email, password });
+    res.cookie('refreshToken', refreshToken, getCookieOptions());
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -30,7 +19,8 @@ const register = async (req, res, next) => {
           email: user.email,
           createdAt: user.createdAt
         },
-        token
+        accessToken,
+        expiresIn: '15m'
       }
     });
   } catch (error) {
@@ -44,42 +34,15 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-
-    // Find user by email
-    const user = await User.findOne({ email }).select('+password');
-    
-    if (!user) {
+    const result = await authService.loginService({ email, password });
+    if (result.error) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: result.error
       });
     }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'Account is deactivated. Please contact support.'
-      });
-    }
-
-    // Validate password
-    const isMatch = await user.comparePassword(password);
-    
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
-
-    // Generate JWT token
-    const token = generateToken(user._id);
-
+    const { user, accessToken, refreshToken } = result;
+    res.cookie('refreshToken', refreshToken, getCookieOptions());
     res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -90,7 +53,8 @@ const login = async (req, res, next) => {
           email: user.email,
           lastLogin: user.lastLogin
         },
-        token
+        accessToken,
+        expiresIn: '15m'
       }
     });
   } catch (error) {
@@ -104,17 +68,69 @@ const login = async (req, res, next) => {
 const logout = async (req, res, next) => {
   try {
     const user = req.user;
-    const token = req.token;
-
-    // Add token to blacklist
-    await user.addToBlacklist(token);
-
+    await authService.logoutService(user);
+    res.clearCookie('refreshToken');
     res.status(200).json({
       success: true,
-      message: 'Logged out successfully'
+      message: 'Logout successful'
     });
   } catch (error) {
     next(error);
+  }
+};
+
+// @desc    Logout from all devices
+// @route   POST /api/auth/logout-all
+// @access  Private
+const logoutAllDevices = async (req, res, next) => {
+  try {
+    const user = req.user;
+    await authService.logoutAllDevicesService(user);
+    res.clearCookie('refreshToken');
+    res.status(200).json({
+      success: true,
+      message: 'Logged out from all devices'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh
+// @access  Public (với refresh token)
+const refreshToken = async (req, res, next) => {
+  try {
+    const { refreshToken: refreshTokenValue } = req.cookies;
+    const result = await authService.refreshTokenService(refreshTokenValue);
+    if (result.error) {
+      return res.status(401).json({
+        success: false,
+        message: result.error
+      });
+    }
+    const { tokens } = result;
+    res.cookie('refreshToken', tokens.refreshToken, getCookieOptions());
+    res.status(200).json({
+      success: true,
+      data: {
+        accessToken: tokens.accessToken,
+        expiresIn: '15m'
+      }
+    });
+  } catch (error) {
+    res.clearCookie('refreshToken');
+    if (error.message === 'TOKEN_EXPIRED') {
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token expired, please login again',
+        code: 'REFRESH_EXPIRED'
+      });
+    }
+    res.status(401).json({
+      success: false,
+      message: 'Invalid refresh token'
+    });
   }
 };
 
@@ -123,8 +139,7 @@ const logout = async (req, res, next) => {
 // @access  Private
 const getProfile = async (req, res, next) => {
   try {
-    const user = req.user;
-
+    const user = authService.getProfileService(req.user);
     res.status(200).json({
       success: true,
       message: 'Profile retrieved successfully',
@@ -135,6 +150,8 @@ const getProfile = async (req, res, next) => {
           email: user.email,
           isActive: user.isActive,
           lastLogin: user.lastLogin,
+          profile: user.profile,
+          gameStats: user.gameStats,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt
         }
@@ -150,16 +167,7 @@ const getProfile = async (req, res, next) => {
 // @access  Private
 const updateProfile = async (req, res, next) => {
   try {
-    const user = req.user;
-    const { username } = req.body;
-
-    // Update only allowed fields
-    if (username) {
-      user.username = username;
-    }
-
-    await user.save();
-
+    const user = await authService.updateProfileService(req.user, req.body);
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
@@ -168,6 +176,7 @@ const updateProfile = async (req, res, next) => {
           id: user._id,
           username: user.username,
           email: user.email,
+          profile: user.profile,
           updatedAt: user.updatedAt
         }
       }
@@ -182,23 +191,14 @@ const updateProfile = async (req, res, next) => {
 // @access  Private
 const changePassword = async (req, res, next) => {
   try {
-    const user = req.user;
     const { currentPassword, newPassword } = req.body;
-
-    // Validate current password
-    const isMatch = await user.comparePassword(currentPassword);
-    
-    if (!isMatch) {
+    const result = await authService.changePasswordService(req.user, { currentPassword, newPassword });
+    if (result && result.error) {
       return res.status(400).json({
         success: false,
-        message: 'Current password is incorrect'
+        message: result.error
       });
     }
-
-    // Update password
-    user.password = newPassword;
-    await user.save();
-
     res.status(200).json({
       success: true,
       message: 'Password changed successfully'
@@ -212,6 +212,8 @@ module.exports = {
   register,
   login,
   logout,
+  logoutAllDevices,
+  refreshToken,
   getProfile,
   updateProfile,
   changePassword

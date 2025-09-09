@@ -7,11 +7,7 @@ const options = {
     info: {
       title: 'GameCard Authentication API',
       version: '1.0.0',
-      description: 'API xác thực người dùng với JWT cho GameCard project',
-      contact: {
-        name: 'GameCard Team',
-        email: 'support@gamecard.com'
-      }
+      description: 'API for user authentication with JWT tokens'
     },
     servers: [
       {
@@ -24,43 +20,10 @@ const options = {
         bearerAuth: {
           type: 'http',
           scheme: 'bearer',
-          bearerFormat: 'JWT',
-          description: 'Nhập JWT token (không cần prefix "Bearer ")'
+          bearerFormat: 'JWT'
         }
       },
       schemas: {
-        User: {
-          type: 'object',
-          properties: {
-            id: {
-              type: 'string',
-              description: 'User ID'
-            },
-            username: {
-              type: 'string',
-              description: 'Tên người dùng'
-            },
-            email: {
-              type: 'string',
-              format: 'email',
-              description: 'Email'
-            },
-            isActive: {
-              type: 'boolean',
-              description: 'Trạng thái tài khoản'
-            },
-            createdAt: {
-              type: 'string',
-              format: 'date-time',
-              description: 'Ngày tạo'
-            },
-            updatedAt: {
-              type: 'string',
-              format: 'date-time',
-              description: 'Ngày cập nhật'
-            }
-          }
-        },
         RegisterRequest: {
           type: 'object',
           required: ['username', 'email', 'password'],
@@ -69,21 +32,16 @@ const options = {
               type: 'string',
               minLength: 3,
               maxLength: 30,
-              pattern: '^[a-zA-Z0-9]+$',
-              description: 'Tên người dùng (3-30 ký tự, chỉ chữ và số)',
-              example: 'gameuser2024'
+              example: 'gameuser123'
             },
             email: {
               type: 'string',
               format: 'email',
-              description: 'Địa chỉ email',
-              example: 'user@gamecard.com'
+              example: 'user@example.com'
             },
             password: {
               type: 'string',
               minLength: 6,
-              pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])',
-              description: 'Mật khẩu (ít nhất 6 ký tự, có chữ thường, chữ hoa và số)',
               example: 'Password123'
             }
           }
@@ -95,12 +53,10 @@ const options = {
             email: {
               type: 'string',
               format: 'email',
-              description: 'Địa chỉ email',
-              example: 'user@gamecard.com'
+              example: 'user@example.com'
             },
             password: {
               type: 'string',
-              description: 'Mật khẩu',
               example: 'Password123'
             }
           }
@@ -110,23 +66,36 @@ const options = {
           properties: {
             success: {
               type: 'boolean',
-              description: 'Trạng thái thành công'
+              example: true
             },
             message: {
               type: 'string',
-              description: 'Thông báo'
+              example: 'Login successful'
             },
-            data: {
+            user: {
               type: 'object',
               properties: {
-                user: {
-                  $ref: '#/components/schemas/User'
-                },
-                token: {
+                id: {
                   type: 'string',
-                  description: 'JWT token'
+                  example: '64f5e1234567890abcdef123'
+                },
+                username: {
+                  type: 'string',
+                  example: 'gameuser123'
+                },
+                email: {
+                  type: 'string',
+                  example: 'user@example.com'
+                },
+                tokenVersion: {
+                  type: 'number',
+                  example: 1
                 }
               }
+            },
+            accessToken: {
+              type: 'string',
+              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
             }
           }
         },
@@ -139,37 +108,76 @@ const options = {
             },
             message: {
               type: 'string',
-              description: 'Thông báo lỗi'
-            },
-            errors: {
+              example: 'Error description'
+            }
+          }
+        },
+        UserProfile: {
+          type: 'object',
+          properties: {
+            id: {
               type: 'string',
-              description: 'Chi tiết lỗi'
+              example: '64f5e1234567890abcdef123'
+            },
+            username: {
+              type: 'string',
+              example: 'gameuser123'
+            },
+            email: {
+              type: 'string',
+              example: 'user@example.com'
+            },
+            profile: {
+              type: 'object',
+              properties: {
+                displayName: {
+                  type: 'string',
+                  example: 'Game User'
+                },
+                avatar: {
+                  type: 'string',
+                  example: 'https://example.com/avatar.jpg'
+                },
+                bio: {
+                  type: 'string',
+                  example: 'Passionate gamer'
+                }
+              }
+            },
+            gameStats: {
+              type: 'object',
+              properties: {
+                gamesPlayed: {
+                  type: 'number',
+                  example: 0
+                },
+                wins: {
+                  type: 'number',
+                  example: 0
+                },
+                losses: {
+                  type: 'number',
+                  example: 0
+                },
+                score: {
+                  type: 'number',
+                  example: 0
+                }
+              }
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2023-09-01T12:00:00.000Z'
             }
           }
         }
       }
-    },
-    tags: [
-      {
-        name: 'Authentication',
-        description: 'API xác thực người dùng'
-      },
-      {
-        name: 'User Profile',
-        description: 'Quản lý thông tin người dùng'
-      },
-      {
-        name: 'Health',
-        description: 'Kiểm tra trạng thái server'
-      }
-    ]
+    }
   },
-  apis: ['./routes/*.js', './server.js']
+  apis: ['./routes/*.js'] // paths to files containing OpenAPI definitions
 };
 
 const specs = swaggerJsdoc(options);
 
-module.exports = {
-  specs,
-  swaggerUi
-};
+module.exports = { specs, swaggerUi };

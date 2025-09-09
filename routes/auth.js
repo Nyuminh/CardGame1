@@ -4,6 +4,8 @@ const {
   register,
   login,
   logout,
+  logoutAllDevices,
+  refreshToken,
   getProfile,
   updateProfile,
   changePassword
@@ -13,16 +15,6 @@ const { registerSchema, loginSchema } = require('../validators/authValidator');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
-
-/**
- * @swagger
- * components:
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- */
 
 // Rate limiting for auth routes
 const authLimiter = rateLimit({
@@ -72,10 +64,6 @@ const loginLimiter = rateLimit({
  *               $ref: '#/components/schemas/AuthResponse'
  *       400:
  *         description: Dữ liệu không hợp lệ
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       429:
  *         description: Quá nhiều yêu cầu
  */
@@ -100,20 +88,52 @@ router.post('/register', authLimiter, validate(registerSchema), register);
  *     responses:
  *       200:
  *         description: Đăng nhập thành công
+ *         headers:
+ *           Set-Cookie:
+ *             description: Refresh token được set trong httpOnly cookie
+ *             schema:
+ *               type: string
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/AuthResponse'
  *       401:
  *         description: Email hoặc mật khẩu không đúng
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       429:
  *         description: Quá nhiều lần đăng nhập thất bại
  */
 router.post('/login', loginLimiter, validate(loginSchema), login);
+
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Authentication]
+ *     description: Lấy access token mới bằng refresh token từ cookie
+ *     responses:
+ *       200:
+ *         description: Token được refresh thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     accessToken:
+ *                       type: string
+ *                     expiresIn:
+ *                       type: string
+ *                       example: "15m"
+ *       401:
+ *         description: Refresh token không hợp lệ hoặc hết hạn
+ */
+router.post('/refresh', refreshToken);
 
 /**
  * @swagger
@@ -126,22 +146,26 @@ router.post('/login', loginLimiter, validate(loginSchema), login);
  *     responses:
  *       200:
  *         description: Đăng xuất thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Logged out successfully"
  *       401:
  *         description: Token không hợp lệ
  */
-// Protected routes
 router.post('/logout', authMiddleware, logout);
+
+/**
+ * @swagger
+ * /api/auth/logout-all:
+ *   post:
+ *     summary: Đăng xuất tất cả thiết bị
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Đăng xuất tất cả thiết bị thành công
+ *       401:
+ *         description: Token không hợp lệ
+ */
+router.post('/logout-all', authMiddleware, logoutAllDevices);
 
 /**
  * @swagger
@@ -154,22 +178,6 @@ router.post('/logout', authMiddleware, logout);
  *     responses:
  *       200:
  *         description: Lấy thông tin thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Profile retrieved successfully"
- *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       $ref: '#/components/schemas/User'
  *       401:
  *         description: Token không hợp lệ
  */
@@ -193,6 +201,18 @@ router.get('/profile', authMiddleware, getProfile);
  *               username:
  *                 type: string
  *                 example: "newusername"
+ *               profile:
+ *                 type: object
+ *                 properties:
+ *                   firstName:
+ *                     type: string
+ *                     example: "John"
+ *                   lastName:
+ *                     type: string
+ *                     example: "Doe"
+ *                   bio:
+ *                     type: string
+ *                     example: "GameCard player"
  *     responses:
  *       200:
  *         description: Cập nhật thành công

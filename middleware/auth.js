@@ -5,22 +5,14 @@ const authMiddleware = async (req, res, next) => {
   try {
     const authHeader = req.header('Authorization');
     
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
-        message: 'No token provided, authorization denied'
+        message: 'Access token required'
       });
     }
 
-    // Check if token follows Bearer format
-    if (!authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token format. Use Bearer <token>'
-      });
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const token = authHeader.substring(7);
     
     if (!token) {
       return res.status(401).json({
@@ -32,6 +24,14 @@ const authMiddleware = async (req, res, next) => {
     try {
       // Verify the token
       const decoded = verifyToken(token);
+      
+      // Check token type
+      if (decoded.type !== 'access') {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid token type'
+        });
+      }
       
       // Find the user
       const user = await User.findById(decoded.userId);
@@ -51,32 +51,32 @@ const authMiddleware = async (req, res, next) => {
         });
       }
 
-      // Check if token is blacklisted
-      if (user.isTokenBlacklisted(token)) {
+      // Check tokenVersion để có thể invalidate tất cả tokens
+      if (decoded.tokenVersion !== user.tokenVersion) {
         return res.status(401).json({
           success: false,
-          message: 'Token has been invalidated'
+          message: 'Token has been invalidated',
+          code: 'TOKEN_INVALIDATED'
         });
       }
 
-      // Add user and token to request object
+      // Add user to request object
       req.user = user;
       req.token = token;
       
       next();
     } catch (jwtError) {
-      if (jwtError.name === 'TokenExpiredError') {
+      if (jwtError.message === 'TOKEN_EXPIRED') {
         return res.status(401).json({
           success: false,
-          message: 'Token has expired'
+          message: 'Access token expired',
+          code: 'TOKEN_EXPIRED'
         });
-      } else if (jwtError.name === 'JsonWebTokenError') {
+      } else {
         return res.status(401).json({
           success: false,
           message: 'Invalid token'
         });
-      } else {
-        throw jwtError;
       }
     }
   } catch (error) {

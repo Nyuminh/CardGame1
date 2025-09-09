@@ -8,7 +8,8 @@ const userSchema = new mongoose.Schema({
     unique: true,
     trim: true,
     minlength: [3, 'Username must be at least 3 characters long'],
-    maxlength: [30, 'Username cannot exceed 30 characters']
+    maxlength: [30, 'Username cannot exceed 30 characters'],
+    index: true
   },
   email: {
     type: String,
@@ -19,31 +20,58 @@ const userSchema = new mongoose.Schema({
     match: [
       /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
       'Please enter a valid email'
-    ]
+    ],
+    index: true
   },
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters long']
+    minlength: [6, 'Password must be at least 6 characters long'],
+    select: false
   },
   isActive: {
     type: Boolean,
-    default: true
+    default: true,
+    index: true
   },
   lastLogin: {
-    type: Date
+    type: Date,
+    default: Date.now
   },
-  tokenBlacklist: [{
-    token: String,
-    createdAt: {
-      type: Date,
-      default: Date.now,
-      expires: 604800 // 7 days in seconds
-    }
-  }]
+  // Token version để invalidate tất cả tokens
+  tokenVersion: {
+    type: Number,
+    default: 0
+  },
+  // Profile cho GameCard
+  profile: {
+    firstName: { type: String, trim: true },
+    lastName: { type: String, trim: true },
+    avatar: { type: String },
+    bio: { type: String, maxlength: 500 }
+  },
+  // Game stats
+  gameStats: {
+    gamesPlayed: { type: Number, default: 0 },
+    gamesWon: { type: Number, default: 0 },
+    totalScore: { type: Number, default: 0 },
+    level: { type: Number, default: 1 }
+  }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { 
+    transform: function(doc, ret) {
+      delete ret.password;
+      delete ret.tokenVersion;
+      delete ret.__v;
+      return ret;
+    }
+  }
 });
+
+// Compound indexes để tối ưu performance
+userSchema.index({ email: 1, isActive: 1 });
+userSchema.index({ username: 1, isActive: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
@@ -51,8 +79,9 @@ userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
   try {
-    // Hash password with cost of 12
-    const hashedPassword = await bcrypt.hash(this.password, 12);
+    // Hash password với salt rounds từ env
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
+    const hashedPassword = await bcrypt.hash(this.password, saltRounds);
     this.password = hashedPassword;
     next();
   } catch (error) {
@@ -65,23 +94,22 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Add token to blacklist
-userSchema.methods.addToBlacklist = async function(token) {
-  this.tokenBlacklist.push({ token });
+// Update last login
+userSchema.methods.updateLastLogin = async function() {
+  this.lastLogin = new Date();
   await this.save();
 };
 
-// Check if token is blacklisted
-userSchema.methods.isTokenBlacklisted = function(token) {
-  return this.tokenBlacklist.some(blacklistedToken => blacklistedToken.token === token);
+// Invalidate tất cả tokens của user (force logout all devices)
+userSchema.methods.invalidateAllTokens = async function() {
+  this.tokenVersion += 1;
+  await this.save();
 };
 
-// Remove user's password from JSON output
-userSchema.methods.toJSON = function() {
-  const user = this.toObject();
-  delete user.password;
-  delete user.tokenBlacklist;
-  return user;
+// Get user's win rate
+userSchema.methods.getWinRate = function() {
+  if (this.gameStats.gamesPlayed === 0) return 0;
+  return (this.gameStats.gamesWon / this.gameStats.gamesPlayed * 100).toFixed(2);
 };
 
 module.exports = mongoose.model('User', userSchema);
