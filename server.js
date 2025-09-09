@@ -1,0 +1,109 @@
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const { specs, swaggerUi } = require('./config/swagger');
+require('dotenv').config();
+
+const authRoutes = require('./routes/auth');
+const { errorHandler } = require('./middleware/errorHandler');
+
+const app = express();
+
+// Security middleware
+app.use(helmet());
+app.use(cors());
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+app.use(limiter);
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
+.then(() => {
+  console.log('✅ Connected to MongoDB Atlas');
+  console.log('📊 Database:', mongoose.connection.db.databaseName);
+  console.log('🌐 Host:', mongoose.connection.host);
+})
+.catch((err) => {
+  console.error('❌ MongoDB connection error:', err.message);
+  if (err.message.includes('authentication failed')) {
+    console.error('🔑 Kiểm tra username/password trong .env file');
+  }
+  process.exit(1);
+});
+
+// Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'GameCard API Documentation'
+}));
+
+// Routes
+app.use('/api/auth', authRoutes);
+
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Kiểm tra trạng thái server
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: Server đang hoạt động
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: OK
+ *                 message:
+ *                   type: string
+ *                   example: Server is running
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ */
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ 
+    success: false, 
+    message: 'Route not found' 
+  });
+});
+
+// Error handling middleware
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
+  console.log(`🔗 Health Check: http://localhost:${PORT}/health`);
+});
