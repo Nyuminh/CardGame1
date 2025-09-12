@@ -45,7 +45,7 @@ const gameCardSchema = new mongoose.Schema({
   },
   image_url: {
     type: String,
-    default: '/images/cards/default.png'
+    default: '/images/default.svg'
   },
   release_date: {
     type: Date,

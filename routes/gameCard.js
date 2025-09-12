@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const gameCardController = require('../controllers/gameCardController');
 const authenticateToken = require('../middleware/auth');
+const upload = require('../middleware/upload');
+const parseFormData = require('../middleware/parseFormData');
 const { validateInput } = require('../middleware/validation');
 const {
   createCardValidator,
@@ -80,23 +82,6 @@ const {
  *                       type: integer
  */
 // Public routes
-// Test endpoint
-router.get('/test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'GameCard API endpoints',
-    availableEndpoints: {
-      'GET /': 'Lấy tất cả thẻ bài (có pagination)',
-      'GET /search': 'Tìm kiếm thẻ bài',
-      'GET /:id': 'Lấy thẻ bài theo ID',
-      'POST /': 'Tạo thẻ bài mới (cần auth)',
-      'PUT /:id': 'Cập nhật thẻ bài (cần auth)',
-      'DELETE /:id': 'Xóa thẻ bài (cần auth)'
-    },
-    note: 'Truy cập /api/cards/ để lấy danh sách thẻ bài'
-  });
-});
-
 router.get('/', searchCardValidator, validateInput, gameCardController.getAllCards);
 
 /**
@@ -175,6 +160,31 @@ router.get('/search', searchCardValidator, validateInput, gameCardController.sea
 
 /**
  * @swagger
+ * /api/cards/types:
+ *   get:
+ *     summary: Lấy danh sách các types
+ *     tags: [GameCards]
+ *     responses:
+ *       200:
+ *         description: Danh sách types thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                   example: [Ancient, Elemental, Beast, Spirit, Hybrid]
+ */
+router.get('/types', gameCardController.getCardTypes);
+
+/**
+ * @swagger
  * /api/cards/{id}:
  *   get:
  *     summary: Lấy thông tin card theo ID
@@ -219,16 +229,72 @@ router.get('/:id', getCardValidator, validateInput, gameCardController.getCardBy
  * @swagger
  * /api/cards:
  *   post:
- *     summary: Tạo card mới
+ *     summary: Tạo card mới với upload ảnh
  *     tags: [GameCards]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
- *             $ref: '#/components/schemas/GameCard'
+ *             type: object
+ *             properties:
+ *               _id:
+ *                 type: string
+ *                 description: ID duy nhất của card
+ *               name:
+ *                 type: string
+ *                 description: Tên của card
+ *               type:
+ *                 type: string
+ *                 enum: [Ancient, Elemental, Beast, Spirit, Hybrid]
+ *                 description: Loại Animon
+ *               origin:
+ *                 type: string
+ *                 description: Nguồn gốc
+ *               dna_rate:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 10
+ *                 description: Tỷ lệ DNA
+ *               icon:
+ *                 type: object
+ *                 properties:
+ *                   ic1:
+ *                     type: string
+ *                   ic2:
+ *                     type: string
+ *                   ic3:
+ *                     type: string
+ *               stats:
+ *                 type: object
+ *                 properties:
+ *                   attack:
+ *                     type: integer
+ *                     minimum: 0
+ *                   defense:
+ *                     type: integer
+ *                     minimum: 0
+ *                   mana:
+ *                     type: integer
+ *                     minimum: 0
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *               lore:
+ *                 type: string
+ *                 description: Câu chuyện về card
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: File ảnh của card (tùy chọn)
  *           example:
  *             _id: "card_001"
  *             name: "Aurelios"
@@ -272,13 +338,13 @@ router.get('/:id', getCardValidator, validateInput, gameCardController.getCardBy
  *         description: Không có quyền truy cập
  */
 // Protected routes (require authentication)
-router.post('/', authenticateToken, createCardValidator, validateInput, gameCardController.createCard);
+router.post('/', authenticateToken, upload.single('image'), parseFormData, createCardValidator, validateInput, gameCardController.createCard);
 
 /**
  * @swagger
  * /api/cards/{id}:
  *   put:
- *     summary: Cập nhật card
+ *     summary: Cập nhật card với upload ảnh
  *     tags: [GameCards]
  *     security:
  *       - bearerAuth: []
@@ -292,9 +358,62 @@ router.post('/', authenticateToken, createCardValidator, validateInput, gameCard
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
- *             $ref: '#/components/schemas/GameCard'
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Tên của card
+ *               type:
+ *                 type: string
+ *                 enum: [Ancient, Elemental, Beast, Spirit, Hybrid]
+ *                 description: Loại Animon
+ *               origin:
+ *                 type: string
+ *                 description: Nguồn gốc
+ *               dna_rate:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 10
+ *                 description: Tỷ lệ DNA
+ *               icon:
+ *                 type: object
+ *                 properties:
+ *                   ic1:
+ *                     type: string
+ *                   ic2:
+ *                     type: string
+ *                   ic3:
+ *                     type: string
+ *               stats:
+ *                 type: object
+ *                 properties:
+ *                   attack:
+ *                     type: integer
+ *                     minimum: 0
+ *                   defense:
+ *                     type: integer
+ *                     minimum: 0
+ *                   mana:
+ *                     type: integer
+ *                     minimum: 0
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *               lore:
+ *                 type: string
+ *                 description: Câu chuyện về card
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: File ảnh mới của card (tùy chọn)
  *     responses:
  *       200:
  *         description: Card được cập nhật thành công
@@ -316,7 +435,7 @@ router.post('/', authenticateToken, createCardValidator, validateInput, gameCard
  *       401:
  *         description: Không có quyền truy cập
  */
-router.put('/:id', authenticateToken, updateCardValidator, validateInput, gameCardController.updateCard);
+router.put('/:id', authenticateToken, upload.single('image'), parseFormData, updateCardValidator, validateInput, gameCardController.updateCard);
 
 /**
  * @swagger
@@ -352,6 +471,24 @@ router.put('/:id', authenticateToken, updateCardValidator, validateInput, gameCa
  *       401:
  *         description: Không có quyền truy cập
  */
+// Test endpoint
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'GameCard API endpoints',
+    availableEndpoints: {
+      'GET /': 'Lấy tất cả thẻ bài (có pagination)',
+      'GET /search': 'Tìm kiếm thẻ bài',
+      'GET /types': 'Lấy danh sách types',
+      'GET /:id': 'Lấy thẻ bài theo ID',
+      'POST /': 'Tạo thẻ bài mới (cần auth)',
+      'PUT /:id': 'Cập nhật thẻ bài (cần auth)',
+      'DELETE /:id': 'Xóa thẻ bài (cần auth)'
+    },
+    note: 'Truy cập /api/cards/ để lấy danh sách thẻ bài'
+  });
+});
+
 router.delete('/:id', authenticateToken, getCardValidator, validateInput, gameCardController.deleteCard);
 
 module.exports = router;

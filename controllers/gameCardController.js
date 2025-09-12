@@ -1,4 +1,6 @@
 const GameCard = require('../models/GameCard');
+const path = require('path');
+const fs = require('fs');
 
 // GET /api/cards - Lấy tất cả cards
 const getAllCards = async (req, res, next) => {
@@ -63,7 +65,13 @@ const createCard = async (req, res, next) => {
       });
     }
 
-    const card = new GameCard(req.body);
+    // Xử lý đường dẫn ảnh nếu có upload
+    const cardData = { ...req.body };
+    if (req.file) {
+      cardData.image_url = `/images/${req.file.filename}`;
+    }
+
+    const card = new GameCard(cardData);
     const savedCard = await card.save();
 
     res.status(201).json({
@@ -72,6 +80,13 @@ const createCard = async (req, res, next) => {
       message: 'Card created successfully'
     });
   } catch (error) {
+    // Xóa file đã upload nếu có lỗi
+    if (req.file) {
+      const filePath = path.join(__dirname, '../images', req.file.filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
     next(error);
   }
 };
@@ -79,18 +94,32 @@ const createCard = async (req, res, next) => {
 // PUT /api/cards/:id - Cập nhật card
 const updateCard = async (req, res, next) => {
   try {
-    const card = await GameCard.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-
-    if (!card) {
+    const existingCard = await GameCard.findById(req.params.id);
+    if (!existingCard) {
       return res.status(404).json({
         success: false,
         message: 'Card not found'
       });
     }
+
+    // Xử lý đường dẫn ảnh nếu có upload mới
+    const updateData = { ...req.body };
+    if (req.file) {
+      // Xóa ảnh cũ nếu có
+      if (existingCard.image_url && existingCard.image_url !== '/images/default.svg') {
+        const oldImagePath = path.join(__dirname, '..', existingCard.image_url);
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      updateData.image_url = `/images/${req.file.filename}`;
+    }
+
+    const card = await GameCard.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    );
 
     res.json({
       success: true,
@@ -98,6 +127,13 @@ const updateCard = async (req, res, next) => {
       message: 'Card updated successfully'
     });
   } catch (error) {
+    // Xóa file đã upload nếu có lỗi
+    if (req.file) {
+      const filePath = path.join(__dirname, '../images', req.file.filename);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
     next(error);
   }
 };
@@ -105,7 +141,7 @@ const updateCard = async (req, res, next) => {
 // DELETE /api/cards/:id - Xóa card
 const deleteCard = async (req, res, next) => {
   try {
-    const card = await GameCard.findByIdAndDelete(req.params.id);
+    const card = await GameCard.findById(req.params.id);
 
     if (!card) {
       return res.status(404).json({
@@ -113,6 +149,16 @@ const deleteCard = async (req, res, next) => {
         message: 'Card not found'
       });
     }
+
+    // Xóa ảnh nếu có
+    if (card.image_url && card.image_url !== '/images/default.svg') {
+      const imagePath = path.join(__dirname, '..', card.image_url);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    await GameCard.findByIdAndDelete(req.params.id);
 
     res.json({
       success: true,
@@ -167,11 +213,26 @@ const searchCards = async (req, res, next) => {
   }
 };
 
+// GET /api/cards/types - Lấy danh sách các types
+const getCardTypes = async (req, res, next) => {
+  try {
+    const types = ['Ancient', 'Elemental', 'Beast', 'Spirit', 'Hybrid'];
+    
+    res.json({
+      success: true,
+      data: types
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllCards,
   getCardById,
   createCard,
   updateCard,
   deleteCard,
-  searchCards
+  searchCards,
+  getCardTypes
 };
