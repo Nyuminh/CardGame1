@@ -11,8 +11,19 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3000' || 'https://cardgame-main.onrender.com/',
-        description: 'Development server'
+        url: process.env.API_BASE_URL || 
+             (process.env.NODE_ENV === 'production' 
+               ? (process.env.RENDER_EXTERNAL_URL || 'https://cardgame-main.onrender.com')
+               : 'http://localhost:3000'),
+        description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server'
+      },
+      {
+        url: 'http://localhost:3000',
+        description: 'Local development server'
+      },
+      {
+        url: 'https://cardgame-main.onrender.com',
+        description: 'Render production server'
       }
     ],
     components: {
