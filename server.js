@@ -21,7 +21,7 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:3000',
-  'https://cardgame1-main.onrender.com',
+  'https://cardgame1-sy8q.onrender.com',
   process.env.FRONTEND_URL
 ].filter(Boolean); // Remove any undefined values
 
