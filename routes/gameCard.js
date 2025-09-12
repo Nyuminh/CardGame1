@@ -80,6 +80,23 @@ const {
  *                       type: integer
  */
 // Public routes
+// Test endpoint
+router.get('/test', (req, res) => {
+  res.json({
+    success: true,
+    message: 'GameCard API endpoints',
+    availableEndpoints: {
+      'GET /': 'Lấy tất cả thẻ bài (có pagination)',
+      'GET /search': 'Tìm kiếm thẻ bài',
+      'GET /:id': 'Lấy thẻ bài theo ID',
+      'POST /': 'Tạo thẻ bài mới (cần auth)',
+      'PUT /:id': 'Cập nhật thẻ bài (cần auth)',
+      'DELETE /:id': 'Xóa thẻ bài (cần auth)'
+    },
+    note: 'Truy cập /api/cards/ để lấy danh sách thẻ bài'
+  });
+});
+
 router.get('/', searchCardValidator, validateInput, gameCardController.getAllCards);
 
 /**

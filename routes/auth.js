@@ -68,6 +68,24 @@ const loginLimiter = rateLimit({
  *         description: Quá nhiều yêu cầu
  */
 // Public routes
+// Root auth route for testing
+router.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Auth API endpoints',
+    availableEndpoints: {
+      'POST /register': 'Đăng ký tài khoản',
+      'POST /login': 'Đăng nhập',
+      'POST /refresh': 'Làm mới token',
+      'POST /logout': 'Đăng xuất (cần auth)',
+      'POST /logout-all': 'Đăng xuất tất cả thiết bị (cần auth)',
+      'GET /profile': 'Xem thông tin cá nhân (cần auth)',
+      'PUT /profile': 'Cập nhật thông tin (cần auth)',
+      'PUT /change-password': 'Đổi mật khẩu (cần auth)'
+    }
+  });
+});
+
 router.post('/register', authLimiter, validate(registerSchema), register);
 
 /**
