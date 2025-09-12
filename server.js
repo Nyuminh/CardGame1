@@ -8,6 +8,7 @@ const { specs, swaggerUi } = require('./config/swagger');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
+const gameCardRoutes = require('./routes/gameCard');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -61,6 +62,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/cards', gameCardRoutes);
 
 /**
  * @swagger
