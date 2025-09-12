@@ -13,7 +13,7 @@ const options = {
       {
         url: process.env.API_BASE_URL || 
              (process.env.NODE_ENV === 'production' 
-               ? (process.env.RENDER_EXTERNAL_URL || 'https://cardgame-main.onrender.com')
+               ? (process.env.RENDER_EXTERNAL_URL || 'https://cardgame1-7ka0.onrender.com')
                : 'http://localhost:3000'),
         description: process.env.NODE_ENV === 'production' ? 'Production server' : 'Development server'
       },
@@ -22,7 +22,7 @@ const options = {
         description: 'Local development server'
       },
       {
-        url: 'https://cardgame-main.onrender.com',
+        url: 'https://cardgame1-7ka0.onrender.com',
         description: 'Render production server'
       }
     ],
