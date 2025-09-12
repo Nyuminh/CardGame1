@@ -4,10 +4,12 @@ const cors = require('cors');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 const { specs, swaggerUi } = require('./config/swagger');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
+const gameCardRoutes = require('./routes/gameCard');
 const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -33,6 +35,9 @@ app.use(limiter);
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from images directory
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
@@ -61,6 +66,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/cards', gameCardRoutes);
 
 /**
  * @swagger

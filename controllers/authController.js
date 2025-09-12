@@ -1,5 +1,5 @@
-const User = require('../models/User');
-const { generateTokens, getCookieOptions } = require('../utils/jwt');
+const { getCookieOptions } = require('../utils/jwt');
+const authService = require('../services/authService');
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -7,22 +7,8 @@ const { generateTokens, getCookieOptions } = require('../utils/jwt');
 const register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
-
-    // Create user
-    const user = new User({
-      username,
-      email,
-      password
-    });
-
-    await user.save();
-
-    // Generate JWT tokens
-    const { accessToken, refreshToken } = generateTokens(user._id, user.tokenVersion);
-
-    // Set refresh token in httpOnly cookie
+    const { user, accessToken, refreshToken } = await authService.registerService({ username, email, password });
     res.cookie('refreshToken', refreshToken, getCookieOptions());
-
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -48,36 +34,15 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-
-    // Find user by email và include password
-    const user = await User.findOne({ email, isActive: true }).select('+password');
-    
-    if (!user) {
+    const result = await authService.loginService({ email, password });
+    if (result.error) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: result.error
       });
     }
-
-    // Validate password
-    const isMatch = await user.comparePassword(password);
-    
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-
-    // Generate JWT tokens
-    const { accessToken, refreshToken } = generateTokens(user._id, user.tokenVersion);
-
-    // Update last login
-    await user.updateLastLogin();
-
-    // Set refresh token in httpOnly cookie
+    const { user, accessToken, refreshToken } = result;
     res.cookie('refreshToken', refreshToken, getCookieOptions());
-
     res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -103,14 +68,8 @@ const login = async (req, res, next) => {
 const logout = async (req, res, next) => {
   try {
     const user = req.user;
-    
-    // IMPORTANT: Tăng tokenVersion để invalidate tất cả tokens của user này
-    user.tokenVersion += 1;
-    await user.save();
-    
-    // Clear refresh token cookie
+    await authService.logoutService(user);
     res.clearCookie('refreshToken');
-
     res.status(200).json({
       success: true,
       message: 'Logout successful'
@@ -126,13 +85,8 @@ const logout = async (req, res, next) => {
 const logoutAllDevices = async (req, res, next) => {
   try {
     const user = req.user;
-
-    // Invalidate tất cả tokens
-    await user.invalidateAllTokens();
-    
-    // Clear refresh token cookie
+    await authService.logoutAllDevicesService(user);
     res.clearCookie('refreshToken');
-
     res.status(200).json({
       success: true,
       message: 'Logged out from all devices'
@@ -147,53 +101,16 @@ const logoutAllDevices = async (req, res, next) => {
 // @access  Public (với refresh token)
 const refreshToken = async (req, res, next) => {
   try {
-    const { refreshToken } = req.cookies;
-
-    if (!refreshToken) {
+    const { refreshToken: refreshTokenValue } = req.cookies;
+    const result = await authService.refreshTokenService(refreshTokenValue);
+    if (result.error) {
       return res.status(401).json({
         success: false,
-        message: 'Refresh token not found'
+        message: result.error
       });
     }
-
-    const { verifyToken } = require('../utils/jwt');
-    const decoded = verifyToken(refreshToken);
-
-    // Check token type
-    if (decoded.type !== 'refresh') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token type'
-      });
-    }
-
-    const user = await User.findById(decoded.userId);
-
-    if (!user || !user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found or inactive'
-      });
-    }
-
-    // Check tokenVersion
-    if (decoded.tokenVersion !== user.tokenVersion) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token has been invalidated'
-      });
-    }
-
-    // IMPORTANT: Tăng tokenVersion để invalidate tất cả tokens cũ
-    user.tokenVersion += 1;
-    await user.save();
-
-    // Generate new tokens với tokenVersion mới
-    const tokens = generateTokens(user._id, user.tokenVersion);
-
-    // Update refresh token cookie
+    const { tokens } = result;
     res.cookie('refreshToken', tokens.refreshToken, getCookieOptions());
-
     res.status(200).json({
       success: true,
       data: {
@@ -201,11 +118,8 @@ const refreshToken = async (req, res, next) => {
         expiresIn: '15m'
       }
     });
-
   } catch (error) {
-    // Clear invalid cookie
     res.clearCookie('refreshToken');
-    
     if (error.message === 'TOKEN_EXPIRED') {
       return res.status(401).json({
         success: false,
@@ -213,7 +127,6 @@ const refreshToken = async (req, res, next) => {
         code: 'REFRESH_EXPIRED'
       });
     }
-
     res.status(401).json({
       success: false,
       message: 'Invalid refresh token'
@@ -226,8 +139,7 @@ const refreshToken = async (req, res, next) => {
 // @access  Private
 const getProfile = async (req, res, next) => {
   try {
-    const user = req.user;
-
+    const user = authService.getProfileService(req.user);
     res.status(200).json({
       success: true,
       message: 'Profile retrieved successfully',
@@ -255,20 +167,7 @@ const getProfile = async (req, res, next) => {
 // @access  Private
 const updateProfile = async (req, res, next) => {
   try {
-    const user = req.user;
-    const { username, profile } = req.body;
-
-    // Update allowed fields
-    if (username) {
-      user.username = username;
-    }
-    
-    if (profile) {
-      user.profile = { ...user.profile, ...profile };
-    }
-
-    await user.save();
-
+    const user = await authService.updateProfileService(req.user, req.body);
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
@@ -292,26 +191,14 @@ const updateProfile = async (req, res, next) => {
 // @access  Private
 const changePassword = async (req, res, next) => {
   try {
-    const user = req.user;
     const { currentPassword, newPassword } = req.body;
-
-    // Get user với password để validate
-    const userWithPassword = await User.findById(user._id).select('+password');
-
-    // Validate current password
-    const isMatch = await userWithPassword.comparePassword(currentPassword);
-    
-    if (!isMatch) {
+    const result = await authService.changePasswordService(req.user, { currentPassword, newPassword });
+    if (result && result.error) {
       return res.status(400).json({
         success: false,
-        message: 'Current password is incorrect'
+        message: result.error
       });
     }
-
-    // Update password
-    userWithPassword.password = newPassword;
-    await userWithPassword.save();
-
     res.status(200).json({
       success: true,
       message: 'Password changed successfully'
