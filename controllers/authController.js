@@ -4,6 +4,7 @@ const authService = require('../services/authService');
 // @desc    Register a new user
 // @route   POST /api/auth/register
 // @access  Public
+
 const register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;

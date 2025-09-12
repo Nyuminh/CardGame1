@@ -57,12 +57,36 @@ mongoose.connect(process.env.MONGODB_URI, {
   process.exit(1);
 });
 
-// Swagger UI
+// Swagger UI - đổi sang /api-docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
   explorer: true,
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'GameCard API Documentation'
 }));
+
+// Root route với thông tin hữu ích
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'GameCard API is running',
+    version: '1.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth',
+      cards: '/api/cards',
+      documentation: '/api-docs'
+    },
+    availableRoutes: {
+      'POST /api/auth/register': 'Đăng ký tài khoản',
+      'POST /api/auth/login': 'Đăng nhập',
+      'POST /api/auth/logout': 'Đăng xuất',
+      'GET /api/cards': 'Lấy danh sách thẻ bài',
+      'POST /api/cards': 'Tạo thẻ bài mới',
+      'GET /health': 'Kiểm tra trạng thái server'
+    }
+  });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -117,6 +141,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
-  console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
+  console.log(`📚 API Documentation: http://localhost:${PORT}/`);
   console.log(`🔗 Health Check: http://localhost:${PORT}/health`);
 });
