@@ -1,54 +1,33 @@
 const Joi = require('joi');
+const { registerSchema, loginSchema } = require('../schemas/joiSchemas');
 
-const registerSchema = Joi.object({
-  username: Joi.string()
-    .alphanum()
-    .min(3)
-    .max(30)
-    .required()
-    .messages({
-      'string.alphanum': 'Username must only contain alphanumeric characters',
-      'string.min': 'Username must be at least 3 characters long',
-      'string.max': 'Username cannot exceed 30 characters',
-      'any.required': 'Username is required'
-    }),
-  
-  email: Joi.string()
-    .email()
-    .required()
-    .messages({
-      'string.email': 'Please enter a valid email address',
-      'any.required': 'Email is required'
-    }),
-  
-  password: Joi.string()
-    .min(6)
-    .pattern(new RegExp('^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])'))
-    .required()
-    .messages({
-      'string.min': 'Password must be at least 6 characters long',
-      'string.pattern.base': 'Password must contain at least one lowercase letter, one uppercase letter, and one number',
-      'any.required': 'Password is required'
-    })
-});
+// Middleware function to validate using Joi
+const createJoiValidator = (schema) => {
+  return (req, res, next) => {
+    const { error, value } = schema.validate(req.body, { 
+      abortEarly: false,
+      allowUnknown: false,
+      stripUnknown: true
+    });
 
-const loginSchema = Joi.object({
-  email: Joi.string()
-    .email()
-    .required()
-    .messages({
-      'string.email': 'Please enter a valid email address',
-      'any.required': 'Email is required'
-    }),
-  
-  password: Joi.string()
-    .required()
-    .messages({
-      'any.required': 'Password is required'
-    })
-});
+    if (error) {
+      const errors = error.details.map(detail => ({
+        field: detail.path.join('.'),
+        message: detail.message
+      }));
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors
+      });
+    }
 
-module.exports = {
-  registerSchema,
-  loginSchema
+    // Store validated data
+    req.body = value;
+    next();
+  };
 };
+
+exports.validateRegister = createJoiValidator(registerSchema);
+exports.validateLogin = createJoiValidator(loginSchema);

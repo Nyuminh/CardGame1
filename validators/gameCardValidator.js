@@ -1,40 +1,41 @@
-const { body, param, query } = require('express-validator');
+const Joi = require('joi');
+const { gameCardCreateSchema, gameCardUpdateSchema, cardFilterQuerySchema, cardSearchQuerySchema } = require('../schemas/joiSchemas');
 
-exports.createCardValidator = [
-  body('_id').notEmpty().withMessage('Card ID is required'),
-  body('name').notEmpty().withMessage('Card name is required'),
-  body('type').isIn(['Ancient', 'Elemental', 'Beast', 'Spirit', 'Hybrid']).withMessage('Invalid card type'),
-  body('origin').notEmpty().withMessage('Origin is required'),
-  body('dna_rate').isInt({ min: 1, max: 10 }).withMessage('DNA rate must be between 1-10'),
-  body('icon.ic1').notEmpty().withMessage('Icon ic1 is required'),
-  body('icon.ic2').notEmpty().withMessage('Icon ic2 is required'),
-  body('icon.ic3').notEmpty().withMessage('Icon ic3 is required'),
-  body('stats.attack').isInt({ min: 0 }).withMessage('Attack must be non-negative'),
-  body('stats.defense').isInt({ min: 0 }).withMessage('Defense must be non-negative'),
-  body('stats.mana').isInt({ min: 0 }).withMessage('Mana must be non-negative'),
-  body('skills').isArray({ min: 1 }).withMessage('At least one skill is required'),
-  body('skills.*.name').notEmpty().withMessage('Skill name is required'),
-  body('skills.*.description').notEmpty().withMessage('Skill description is required'),
-  body('lore').notEmpty().withMessage('Lore is required')
-];
+// Middleware function to validate using Joi
+const createJoiValidator = (schema, source = 'body') => {
+  return (req, res, next) => {
+    const data = source === 'query' ? req.query : req.body;
+    const { error, value } = schema.validate(data, { 
+      abortEarly: false,
+      allowUnknown: false,
+      stripUnknown: true
+    });
 
-exports.updateCardValidator = [
-  param('id').notEmpty().withMessage('Card ID is required'),
-  body('name').optional().notEmpty().withMessage('Card name cannot be empty'),
-  body('type').optional().isIn(['Ancient', 'Elemental', 'Beast', 'Spirit', 'Hybrid']).withMessage('Invalid card type'),
-  body('dna_rate').optional().isInt({ min: 1, max: 10 }).withMessage('DNA rate must be between 1-10'),
-  body('stats.attack').optional().isInt({ min: 0 }).withMessage('Attack must be non-negative'),
-  body('stats.defense').optional().isInt({ min: 0 }).withMessage('Defense must be non-negative'),
-  body('stats.mana').optional().isInt({ min: 0 }).withMessage('Mana must be non-negative')
-];
+    if (error) {
+      const errors = error.details.map(detail => ({
+        field: detail.path.join('.'),
+        message: detail.message
+      }));
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors
+      });
+    }
 
-exports.getCardValidator = [
-  param('id').notEmpty().withMessage('Card ID is required')
-];
+    // Store validated data
+    if (source === 'query') {
+      req.query = value;
+    } else {
+      req.body = value;
+    }
+    
+    next();
+  };
+};
 
-exports.searchCardValidator = [
-  query('page').optional().isInt({ min: 1 }).withMessage('Page must be positive integer'),
-  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1-100'),
-  query('min_attack').optional().isInt({ min: 0 }).withMessage('Min attack must be non-negative'),
-  query('max_attack').optional().isInt({ min: 0 }).withMessage('Max attack must be non-negative')
-];
+exports.createCardValidator = createJoiValidator(gameCardCreateSchema, 'body');
+exports.updateCardValidator = createJoiValidator(gameCardUpdateSchema, 'body');
+exports.cardFilterValidator = createJoiValidator(cardFilterQuerySchema, 'query');
+exports.cardSearchValidator = createJoiValidator(cardSearchQuerySchema, 'query');

@@ -8,178 +8,126 @@ const { validateInput } = require('../middleware/validation');
 const {
   createCardValidator,
   updateCardValidator,
-  getCardValidator,
-  searchCardValidator
+  cardFilterValidator,
+  cardSearchValidator
 } = require('../validators/gameCardValidator');
 
 /**
  * @swagger
  * tags:
  *   name: GameCards
- *   description: Game card management
+ *   description: Game card management endpoints
  */
 
 /**
  * @swagger
  * /api/cards:
  *   get:
- *     summary: Lấy danh sách tất cả cards
+ *     summary: Get all game cards with filtering and pagination
  *     tags: [GameCards]
  *     parameters:
  *       - in: query
  *         name: page
+ *         required: false
  *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: Số trang
+ *           $ref: '#/components/schemas/PaginationQuery/properties/page'
  *       - in: query
  *         name: limit
+ *         required: false
  *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 10
- *         description: Số lượng cards mỗi trang
+ *           $ref: '#/components/schemas/PaginationQuery/properties/limit'
  *       - in: query
  *         name: type
+ *         required: false
  *         schema:
- *           type: string
- *           enum: [Ancient, Elemental, Beast, Spirit, Hybrid]
- *         description: Loại Animon
+ *           $ref: '#/components/schemas/CardFilterQuery/properties/type'
  *       - in: query
  *         name: dna_rate
+ *         required: false
  *         schema:
- *           type: number
- *           minimum: 1
- *           maximum: 10
- *         description: Mã DNA
+ *           $ref: '#/components/schemas/CardFilterQuery/properties/dna_rate'
  *     responses:
  *       200:
- *         description: Danh sách cards
+ *         description: List of cards with pagination
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/GameCard'
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     page:
- *                       type: integer
- *                     limit:
- *                       type: integer
- *                     total:
- *                       type: integer
- *                     pages:
- *                       type: integer
+ *               $ref: '#/components/schemas/PaginatedCardsResponse'
+ *       400:
+ *         description: Bad request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-// Public routes
-router.get('/', searchCardValidator, validateInput, gameCardController.getAllCards);
+router.get('/', cardFilterValidator, validateInput, gameCardController.getAllCards);
 
 /**
  * @swagger
  * /api/cards/search:
  *   get:
- *     summary: Tìm kiếm cards
+ *     summary: Search game cards
  *     tags: [GameCards]
  *     parameters:
  *       - in: query
  *         name: q
+ *         required: false
  *         schema:
- *           type: string
- *         description: Từ khóa tìm kiếm (name, lore)
+ *           $ref: '#/components/schemas/CardSearchQuery/properties/q'
  *       - in: query
  *         name: type
+ *         required: false
  *         schema:
- *           type: string
- *           enum: [Ancient, Elemental, Beast, Spirit, Hybrid]
- *         description: Loại Animon
+ *           $ref: '#/components/schemas/CardSearchQuery/properties/type'
  *       - in: query
  *         name: min_attack
+ *         required: false
  *         schema:
- *           type: number
- *           minimum: 0
- *         description: Attack tối thiểu
+ *           $ref: '#/components/schemas/CardSearchQuery/properties/min_attack'
  *       - in: query
  *         name: max_attack
+ *         required: false
  *         schema:
- *           type: number
- *           minimum: 0
- *         description: Attack tối đa
+ *           $ref: '#/components/schemas/CardSearchQuery/properties/max_attack'
  *       - in: query
  *         name: page
+ *         required: false
  *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: Số trang
+ *           $ref: '#/components/schemas/CardSearchQuery/properties/page'
  *       - in: query
  *         name: limit
+ *         required: false
  *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 10
- *         description: Số lượng cards mỗi trang
+ *           $ref: '#/components/schemas/CardSearchQuery/properties/limit'
  *     responses:
  *       200:
- *         description: Kết quả tìm kiếm
+ *         description: Search results with pagination
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/GameCard'
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     page:
- *                       type: integer
- *                     limit:
- *                       type: integer
- *                     total:
- *                       type: integer
- *                     pages:
- *                       type: integer
+ *               $ref: '#/components/schemas/PaginatedCardsResponse'
+ *       400:
+ *         description: Bad request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/search', searchCardValidator, validateInput, gameCardController.searchCards);
+router.get('/search', cardSearchValidator, validateInput, gameCardController.searchCards);
 
 /**
  * @swagger
  * /api/cards/types:
  *   get:
- *     summary: Lấy danh sách các types
+ *     summary: Get available card types
  *     tags: [GameCards]
  *     responses:
  *       200:
- *         description: Danh sách types thành công
+ *         description: List of available card types
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: array
- *                   items:
- *                     type: string
- *                   example: [Ancient, Elemental, Beast, Spirit, Hybrid]
+ *               $ref: '#/components/schemas/CardTypesResponse'
  */
 router.get('/types', gameCardController.getCardTypes);
 
@@ -187,7 +135,7 @@ router.get('/types', gameCardController.getCardTypes);
  * @swagger
  * /api/cards/{id}:
  *   get:
- *     summary: Lấy thông tin card theo ID
+ *     summary: Get a specific game card by ID
  *     tags: [GameCards]
  *     parameters:
  *       - in: path
@@ -195,41 +143,31 @@ router.get('/types', gameCardController.getCardTypes);
  *         required: true
  *         schema:
  *           type: string
- *         description: ID của card
+ *         description: Card ID
+ *         example: 'card_001'
  *     responses:
  *       200:
- *         description: Thông tin card
+ *         description: Card details
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/GameCard'
+ *               $ref: '#/components/schemas/SingleCardResponse'
  *       404:
- *         description: Card không tồn tại
+ *         description: Card not found
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                   example: Card not found
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/:id', getCardValidator, validateInput, gameCardController.getCardById);
+router.get('/:id', gameCardController.getCardById);
+
+// Protected routes (require authentication)
 
 /**
  * @swagger
  * /api/cards:
  *   post:
- *     summary: Tạo card mới với upload ảnh
+ *     summary: Create a new game card
  *     tags: [GameCards]
  *     security:
  *       - bearerAuth: []
@@ -239,112 +177,57 @@ router.get('/:id', getCardValidator, validateInput, gameCardController.getCardBy
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             properties:
- *               _id:
- *                 type: string
- *                 description: ID duy nhất của card
- *               name:
- *                 type: string
- *                 description: Tên của card
- *               type:
- *                 type: string
- *                 enum: [Ancient, Elemental, Beast, Spirit, Hybrid]
- *                 description: Loại Animon
- *               origin:
- *                 type: string
- *                 description: Nguồn gốc
- *               dna_rate:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 10
- *                 description: Tỷ lệ DNA
- *               icon:
- *                 type: object
+ *             allOf:
+ *               - $ref: '#/components/schemas/GameCardCreateRequest'
+ *               - type: object
  *                 properties:
- *                   ic1:
+ *                   image:
  *                     type: string
- *                   ic2:
- *                     type: string
- *                   ic3:
- *                     type: string
- *               stats:
- *                 type: object
- *                 properties:
- *                   attack:
- *                     type: integer
- *                     minimum: 0
- *                   defense:
- *                     type: integer
- *                     minimum: 0
- *                   mana:
- *                     type: integer
- *                     minimum: 0
- *               skills:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     name:
- *                       type: string
- *                     description:
- *                       type: string
- *               lore:
- *                 type: string
- *                 description: Câu chuyện về card
- *               image:
- *                 type: string
- *                 format: binary
- *                 description: File ảnh của card (tùy chọn)
- *           example:
- *             _id: "card_001"
- *             name: "Aurelios"
- *             type: "Ancient"
- *             origin: "Hinh thanh tu cai j do bla bla"
- *             dna_rate: 5
- *             icon:
- *               ic1: "Tự do"
- *               ic2: "bản năng"
- *               ic3: "sự trung thành"
- *             stats:
- *               attack: 800
- *               defense: 600
- *               mana: 300
- *             skills:
- *               - name: "Primordial Light"
- *                 description: "Tấn công tất cả kẻ địch, hồi 20% HP."
- *               - name: "DNA Fusion"
- *                 description: "Kết hợp với 1 Animon bất kỳ để tạo Animon lai."
- *             lore: "Chúa tể ánh sáng nguyên thủy..."
- *             image_url: "/images/cards/aurelios.png"
+ *                     format: binary
+ *                     description: Card image file
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/GameCardCreateRequest'
  *     responses:
  *       201:
- *         description: Card được tạo thành công
+ *         description: Card created successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/GameCard'
- *                 message:
- *                   type: string
- *                   example: Card created successfully
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SingleCardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: 'Card created successfully'
  *       400:
- *         description: Dữ liệu không hợp lệ hoặc ID đã tồn tại
+ *         description: Bad request or card ID already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-// Protected routes (require authentication)
-router.post('/', authenticateToken, upload.single('image'), parseFormData, createCardValidator, validateInput, gameCardController.createCard);
+router.post('/', 
+  authenticateToken, 
+  upload.single('image'), 
+  parseFormData, 
+  createCardValidator, 
+  validateInput, 
+  gameCardController.createCard
+);
 
 /**
  * @swagger
  * /api/cards/{id}:
  *   put:
- *     summary: Cập nhật card với upload ảnh
+ *     summary: Update an existing game card
  *     tags: [GameCards]
  *     security:
  *       - bearerAuth: []
@@ -354,94 +237,65 @@ router.post('/', authenticateToken, upload.single('image'), parseFormData, creat
  *         required: true
  *         schema:
  *           type: string
- *         description: ID của card
+ *         description: Card ID
+ *         example: 'card_001'
  *     requestBody:
  *       required: true
  *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
- *             properties:
- *               name:
- *                 type: string
- *                 description: Tên của card
- *               type:
- *                 type: string
- *                 enum: [Ancient, Elemental, Beast, Spirit, Hybrid]
- *                 description: Loại Animon
- *               origin:
- *                 type: string
- *                 description: Nguồn gốc
- *               dna_rate:
- *                 type: integer
- *                 minimum: 1
- *                 maximum: 10
- *                 description: Tỷ lệ DNA
- *               icon:
- *                 type: object
+ *             allOf:
+ *               - $ref: '#/components/schemas/GameCardUpdateRequest'
+ *               - type: object
  *                 properties:
- *                   ic1:
+ *                   image:
  *                     type: string
- *                   ic2:
- *                     type: string
- *                   ic3:
- *                     type: string
- *               stats:
- *                 type: object
- *                 properties:
- *                   attack:
- *                     type: integer
- *                     minimum: 0
- *                   defense:
- *                     type: integer
- *                     minimum: 0
- *                   mana:
- *                     type: integer
- *                     minimum: 0
- *               skills:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     name:
- *                       type: string
- *                     description:
- *                       type: string
- *               lore:
- *                 type: string
- *                 description: Câu chuyện về card
- *               image:
- *                 type: string
- *                 format: binary
- *                 description: File ảnh mới của card (tùy chọn)
+ *                     format: binary
+ *                     description: New card image file
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/GameCardUpdateRequest'
  *     responses:
  *       200:
- *         description: Card được cập nhật thành công
+ *         description: Card updated successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/GameCard'
- *                 message:
- *                   type: string
- *                   example: Card updated successfully
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SingleCardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: 'Card updated successfully'
  *       404:
- *         description: Card không tồn tại
+ *         description: Card not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', authenticateToken, upload.single('image'), parseFormData, updateCardValidator, validateInput, gameCardController.updateCard);
+router.put('/:id', 
+  authenticateToken, 
+  upload.single('image'), 
+  parseFormData, 
+  updateCardValidator, 
+  validateInput, 
+  gameCardController.updateCard
+);
 
 /**
  * @swagger
  * /api/cards/{id}:
  *   delete:
- *     summary: Xóa card
+ *     summary: Delete a game card
  *     tags: [GameCards]
  *     security:
  *       - bearerAuth: []
@@ -451,44 +305,34 @@ router.put('/:id', authenticateToken, upload.single('image'), parseFormData, upd
  *         required: true
  *         schema:
  *           type: string
- *         description: ID của card
+ *         description: Card ID
+ *         example: 'card_001'
  *     responses:
  *       200:
- *         description: Card được xóa thành công
+ *         description: Card deleted successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Card deleted successfully
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: 'Card deleted successfully'
  *       404:
- *         description: Card không tồn tại
+ *         description: Card not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Không có quyền truy cập
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-// Test endpoint
-router.get('/test', (req, res) => {
-  res.json({
-    success: true,
-    message: 'GameCard API endpoints',
-    availableEndpoints: {
-      'GET /': 'Lấy tất cả thẻ bài (có pagination)',
-      'GET /search': 'Tìm kiếm thẻ bài',
-      'GET /types': 'Lấy danh sách types',
-      'GET /:id': 'Lấy thẻ bài theo ID',
-      'POST /': 'Tạo thẻ bài mới (cần auth)',
-      'PUT /:id': 'Cập nhật thẻ bài (cần auth)',
-      'DELETE /:id': 'Xóa thẻ bài (cần auth)'
-    },
-    note: 'Truy cập /api/cards/ để lấy danh sách thẻ bài'
-  });
-});
-
-router.delete('/:id', authenticateToken, getCardValidator, validateInput, gameCardController.deleteCard);
+router.delete('/:id', authenticateToken, gameCardController.deleteCard);
 
 module.exports = router;

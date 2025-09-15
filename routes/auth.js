@@ -10,8 +10,8 @@ const {
   updateProfile,
   changePassword
 } = require('../controllers/authController');
-const { validate } = require('../middleware/validation');
-const { registerSchema, loginSchema } = require('../validators/authValidator');
+const { validateInput } = require('../middleware/validation');
+const { validateRegister, validateLogin } = require('../validators/authValidator');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
@@ -41,9 +41,16 @@ const loginLimiter = rateLimit({
 
 /**
  * @swagger
+ * tags:
+ *   name: Authentication
+ *   description: User authentication and profile management
+ */
+
+/**
+ * @swagger
  * /api/auth/register:
  *   post:
- *     summary: Đăng ký tài khoản mới
+ *     summary: Register a new user account
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -51,48 +58,33 @@ const loginLimiter = rateLimit({
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/RegisterRequest'
- *           example:
- *             username: "gameuser2024"
- *             email: "user@gamecard.com"
- *             password: "Password123"
  *     responses:
  *       201:
- *         description: Đăng ký thành công
+ *         description: User registered successfully
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/AuthResponse'
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: Validation error or user already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       429:
- *         description: Quá nhiều yêu cầu
+ *         description: Too many registration attempts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-// Public routes
-// Root auth route for testing
-router.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Auth API endpoints',
-    availableEndpoints: {
-      'POST /register': 'Đăng ký tài khoản',
-      'POST /login': 'Đăng nhập',
-      'POST /refresh': 'Làm mới token',
-      'POST /logout': 'Đăng xuất (cần auth)',
-      'POST /logout-all': 'Đăng xuất tất cả thiết bị (cần auth)',
-      'GET /profile': 'Xem thông tin cá nhân (cần auth)',
-      'PUT /profile': 'Cập nhật thông tin (cần auth)',
-      'PUT /change-password': 'Đổi mật khẩu (cần auth)'
-    }
-  });
-});
-
-router.post('/register', authLimiter, validate(registerSchema), register);
+router.post('/register', authLimiter, validateRegister, register);
 
 /**
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Đăng nhập
+ *     summary: Login with email and password
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -100,38 +92,138 @@ router.post('/register', authLimiter, validate(registerSchema), register);
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/LoginRequest'
- *           example:
- *             email: "user@gamecard.com"
- *             password: "Password123"
  *     responses:
  *       200:
- *         description: Đăng nhập thành công
- *         headers:
- *           Set-Cookie:
- *             description: Refresh token được set trong httpOnly cookie
- *             schema:
- *               type: string
+ *         description: Login successful
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/AuthResponse'
+ *         headers:
+ *           Set-Cookie:
+ *             description: Refresh token cookie
+ *             schema:
+ *               type: string
+ *               example: refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; HttpOnly; Path=/; SameSite=Strict
  *       401:
- *         description: Email hoặc mật khẩu không đúng
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       429:
- *         description: Quá nhiều lần đăng nhập thất bại
+ *         description: Too many login attempts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/login', loginLimiter, validate(loginSchema), login);
+router.post('/login', loginLimiter, validateLogin, login);
 
 /**
  * @swagger
  * /api/auth/refresh:
  *   post:
- *     summary: Refresh access token
+ *     summary: Refresh access token using refresh token
  *     tags: [Authentication]
- *     description: Lấy access token mới bằng refresh token từ cookie
+ *     parameters:
+ *       - in: cookie
+ *         name: refreshToken
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: HTTP-only refresh token cookie
  *     responses:
  *       200:
- *         description: Token được refresh thành công
+ *         description: Token refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 accessToken:
+ *                   type: string
+ *                   example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     username:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *       401:
+ *         description: Invalid or expired refresh token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post('/refresh', refreshToken);
+
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     summary: Logout from current device
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post('/logout', authMiddleware, logout);
+
+/**
+ * @swagger
+ * /api/auth/logout-all:
+ *   post:
+ *     summary: Logout from all devices
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out from all devices successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       401:
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.post('/logout-all', authMiddleware, logoutAllDevices);
+
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   get:
+ *     summary: Get user profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -141,63 +233,13 @@ router.post('/login', loginLimiter, validate(loginSchema), login);
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: object
- *                   properties:
- *                     accessToken:
- *                       type: string
- *                     expiresIn:
- *                       type: string
- *                       example: "15m"
+ *                   $ref: '#/components/schemas/UserProfile'
  *       401:
- *         description: Refresh token không hợp lệ hoặc hết hạn
- */
-router.post('/refresh', refreshToken);
-
-/**
- * @swagger
- * /api/auth/logout:
- *   post:
- *     summary: Đăng xuất
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Đăng xuất thành công
- *       401:
- *         description: Token không hợp lệ
- */
-router.post('/logout', authMiddleware, logout);
-
-/**
- * @swagger
- * /api/auth/logout-all:
- *   post:
- *     summary: Đăng xuất tất cả thiết bị
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Đăng xuất tất cả thiết bị thành công
- *       401:
- *         description: Token không hợp lệ
- */
-router.post('/logout-all', authMiddleware, logoutAllDevices);
-
-/**
- * @swagger
- * /api/auth/profile:
- *   get:
- *     summary: Xem thông tin cá nhân
- *     tags: [User Profile]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lấy thông tin thành công
- *       401:
- *         description: Token không hợp lệ
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/profile', authMiddleware, getProfile);
 
@@ -205,8 +247,8 @@ router.get('/profile', authMiddleware, getProfile);
  * @swagger
  * /api/auth/profile:
  *   put:
- *     summary: Cập nhật thông tin cá nhân
- *     tags: [User Profile]
+ *     summary: Update user profile
+ *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -216,26 +258,40 @@ router.get('/profile', authMiddleware, getProfile);
  *           schema:
  *             type: object
  *             properties:
- *               username:
- *                 type: string
- *                 example: "newusername"
  *               profile:
  *                 type: object
  *                 properties:
- *                   firstName:
+ *                   displayName:
  *                     type: string
- *                     example: "John"
- *                   lastName:
+ *                     example: 'New Display Name'
+ *                   avatar:
  *                     type: string
- *                     example: "Doe"
+ *                     example: 'https://example.com/new-avatar.jpg'
  *                   bio:
  *                     type: string
- *                     example: "GameCard player"
+ *                     example: 'Updated bio'
  *     responses:
  *       200:
- *         description: Cập nhật thành công
+ *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/UserProfile'
+ *                 message:
+ *                   type: string
+ *                   example: 'Profile updated successfully'
  *       401:
- *         description: Token không hợp lệ
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put('/profile', authMiddleware, updateProfile);
 
@@ -243,8 +299,8 @@ router.put('/profile', authMiddleware, updateProfile);
  * @swagger
  * /api/auth/change-password:
  *   put:
- *     summary: Đổi mật khẩu
- *     tags: [User Profile]
+ *     summary: Change user password
+ *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -253,21 +309,35 @@ router.put('/profile', authMiddleware, updateProfile);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [currentPassword, newPassword]
+ *             required: ['currentPassword', 'newPassword']
  *             properties:
  *               currentPassword:
  *                 type: string
- *                 example: "Password123"
+ *                 description: Current password
+ *                 example: 'CurrentPassword123'
  *               newPassword:
  *                 type: string
- *                 example: "NewPassword456"
+ *                 description: New password (minimum 6 characters)
+ *                 example: 'NewPassword123'
  *     responses:
  *       200:
- *         description: Đổi mật khẩu thành công
+ *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
  *       400:
- *         description: Mật khẩu hiện tại không đúng
+ *         description: Invalid current password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Token không hợp lệ
+ *         description: Unauthorized
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put('/change-password', authMiddleware, changePassword);
 
